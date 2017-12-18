@@ -2,14 +2,13 @@
 #include "framework/logger.h"
 #include "library/xorshift.h"
 
+#define BOOST_TEST_ALTERNATIVE_INIT_API
+#include <boost/test/included/unit_test.hpp>
+
 using namespace OpenApoc;
 
-int main(int argc, char **argv)
+BOOST_AUTO_TEST_CASE(testExpectedValues)
 {
-	if (config().parseOptions(argc, argv))
-	{
-		return EXIT_FAILURE;
-	}
 	Xorshift128Plus<uint64_t> rng{};
 
 	uint64_t r1 = rng();
@@ -19,17 +18,10 @@ int main(int argc, char **argv)
 	uint64_t expected_r2 = 0xcb8aa3521c8fc259;
 	uint64_t expected_r3 = 0xdd420b258a17fa82;
 
-	if (r1 != expected_r1)
-	{
-		LogError("unexpected r1 0x%016x, expected 0x%016x", r1, expected_r1);
-		return EXIT_FAILURE;
-	}
-
-	if (r2 != expected_r2)
-	{
-		LogError("unexpected r2 0x%016x, expected 0x%016x", r2, expected_r2);
-		return EXIT_FAILURE;
-	}
+	BOOST_TEST(r1 == expected_r1,
+	           format("unexpected r1 0x%016x, expected 0x%016x", r1, expected_r1));
+	BOOST_TEST(r2 == expected_r2,
+	           format("unexpected r2 0x%016x, expected 0x%016x", r2, expected_r2));
 
 	// Save the state to another rng and check that result matches
 
@@ -40,11 +32,13 @@ int main(int argc, char **argv)
 	rng2.setState(s);
 
 	uint64_t r3 = rng2();
-	if (r3 != expected_r3)
-	{
-		LogError("unexpected r3 0x%016x, expected 0x%016x", r3, expected_r3);
-		return EXIT_FAILURE;
-	}
+	BOOST_TEST(r3 == expected_r3,
+	           format("unexpected r3 0x%016x, expected 0x%016x", r3, expected_r3));
+}
+
+BOOST_AUTO_TEST_CASE(testDistribution)
+{
+	Xorshift128Plus<uint64_t> rng{};
 
 	constexpr int num_test_buckets = 4;
 	constexpr int num_test_iterations = 500000;
@@ -66,6 +60,11 @@ int main(int argc, char **argv)
 	{
 		LogWarning("%d:\t%u", i, buckets[i]);
 	}
+}
 
-	return EXIT_SUCCESS;
+bool init_unit_test()
+{
+	auto &suite = boost::unit_test::framework::master_test_suite();
+
+	return !config().parseOptions(suite.argc, suite.argv);
 }

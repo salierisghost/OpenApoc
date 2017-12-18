@@ -25,6 +25,9 @@
     <ProjectReference Include="..\framework\framework.vcxproj">
       <Project>{a61ce9b3-b257-4978-9e8b-cabb592ec2ce}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\game\state\gamestate.vcxproj">
+      <Project>{55da5dd0-c503-426e-8322-e8e2d0e1a71b}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\library\library.vcxproj">
       <Project>{832bd75c-0c8c-4d12-a518-7b1aae3dd0ac}</Project>
     </ProjectReference>
