@@ -11,7 +11,7 @@ foreach(TEST ${TEST_LIST})
 		# Just add all libs?
 		target_link_libraries(${TEST} OpenApoc_Library OpenApoc_Framework
 				OpenApoc_GameState)
-		target_include_directories((${TEST} PUBLIC ${Boost_INCLUDE_DIRS})
+		target_include_directories(${TEST} PUBLIC ${Boost_INCLUDE_DIRS})
 		target_compile_definitions(${TEST} PRIVATE -DUNIT_TEST)
 		add_test(NAME ${TEST} COMMAND ${EXECUTABLE_OUTPUT_PATH}/${TEST}
 				--Framework.CD=${CD_PATH} --Framework.Data=${CMAKE_SOURCE_DIR}/data)
@@ -25,7 +25,7 @@ add_executable(${TEST} ${TEST}.cpp)
 # Just add all libs?
 target_link_libraries(${TEST} OpenApoc_Library OpenApoc_Framework
 		OpenApoc_GameState)
-target_include_directories((${TEST} PUBLIC ${Boost_INCLUDE_DIRS})
+target_include_directories(${TEST} PUBLIC ${Boost_INCLUDE_DIRS})
 target_compile_definitions(${TEST} PRIVATE -DUNIT_TEST)
 add_test(NAME ${TEST}_difficulty1 COMMAND ${EXECUTABLE_OUTPUT_PATH}/${TEST}
 		${CMAKE_SOURCE_DIR}/data/difficulty1_patched
