@@ -1,7 +1,7 @@
 PROJECT (OpenApoc_Tests CXX C)
 CMAKE_MINIMUM_REQUIRED(VERSION 3.1)
 
-find_package(Boost REQUIRED)
+find_package(Boost REQUIRED COMPONENTS unit_test_framework)
 
 set (TEST_LIST test_rect test_voxel test_tilemap test_rng test_images
 		test_unicode)
