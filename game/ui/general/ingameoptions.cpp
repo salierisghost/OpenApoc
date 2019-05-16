@@ -114,7 +114,7 @@ std::list<std::pair<UString, UString>> openApocList = {
     {"OpenApoc.Mod", "BSKLauncherSound"},
 };
 
-std::vector<UString> listNames = {"Message Toggles", "OpenApoc Features"};
+std::vector<UString> listNames = {tr("Message Toggles"), tr("OpenApoc Features")};
 } // namespace
 
 InGameOptions::InGameOptions(sp<GameState> state)
@@ -157,12 +157,12 @@ void InGameOptions::loadList(int id)
 	{
 		auto checkBox = mksp<CheckBox>(fw().data->loadImage("BUTTON_CHECKBOX_TRUE"),
 		                               fw().data->loadImage("BUTTON_CHECKBOX_FALSE"));
-		checkBox->Size = {240, 16};
+		checkBox->Size = {240, listControl->ItemSize};
 		UString full_name = p.first + "." + p.second;
 		checkBox->setData(mksp<UString>(full_name));
 		checkBox->setChecked(config().getBool(full_name));
 		auto label = checkBox->createChild<Label>(tr(config().describe(p.first, p.second)), font);
-		label->Size = {216, 16};
+		label->Size = {216, listControl->ItemSize};
 		label->Location = {24, 0};
 		listControl->addItem(checkBox);
 	}
@@ -194,14 +194,22 @@ void InGameOptions::begin()
 	menuform->findControlTyped<CheckBox>("AUTO_SCROLL")
 	    ->setChecked(config().getBool("Options.Misc.AutoScroll"));
 	menuform->findControlTyped<CheckBox>("TOOL_TIPS")
-	    ->setChecked(config().getBool("Options.Misc.ToolTips"));
+	    ->setChecked(config().getInt("Options.Misc.ToolTipDelay") > 0);
 	menuform->findControlTyped<CheckBox>("ACTION_MUSIC")
 	    ->setChecked(config().getBool("Options.Misc.ActionMusic"));
 	menuform->findControlTyped<CheckBox>("AUTO_EXECUTE_ORDERS")
 	    ->setChecked(config().getBool("Options.Misc.AutoExecute"));
 
-	menuform->findControlTyped<TextButton>("BUTTON_BATTLE")
-	    ->setText(state->current_battle ? "Exit Battle" : "Skirmish Mode");
+	if (state->current_battle)
+	{
+		menuform->findControlTyped<TextButton>("BUTTON_EXIT_BATTLE")->setVisible(true);
+		menuform->findControlTyped<TextButton>("BUTTON_SKIRMISH")->setVisible(false);
+	}
+	else
+	{
+		menuform->findControlTyped<TextButton>("BUTTON_EXIT_BATTLE")->setVisible(false);
+		menuform->findControlTyped<TextButton>("BUTTON_SKIRMISH")->setVisible(true);
+	}
 
 	menuform->findControlTyped<Label>("TEXT_FUNDS")->setText(state->getPlayerBalance());
 
@@ -225,8 +233,8 @@ void InGameOptions::finish()
 
 	config().set("Options.Misc.AutoScroll",
 	             menuform->findControlTyped<CheckBox>("AUTO_SCROLL")->isChecked());
-	config().set("Options.Misc.ToolTips",
-	             menuform->findControlTyped<CheckBox>("TOOL_TIPS")->isChecked());
+	config().set("Options.Misc.ToolTipDelay",
+	             menuform->findControlTyped<CheckBox>("TOOL_TIPS")->isChecked() ? 500 : 0);
 	config().set("Options.Misc.ActionMusic",
 	             menuform->findControlTyped<CheckBox>("ACTION_MUSIC")->isChecked());
 	config().set("Options.Misc.AutoExecute",
@@ -293,27 +301,24 @@ void InGameOptions::eventOccurred(Event *e)
 			fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<CheatOptions>(state)});
 			return;
 		}
-		if (e->forms().RaisedBy->Name == "BUTTON_BATTLE")
+		if (e->forms().RaisedBy->Name == "BUTTON_EXIT_BATTLE")
 		{
-			if (state->current_battle)
-			{
-				int unitsLost = state->current_battle->killStrandedUnits(
-				    *state, state->current_battle->currentPlayer, true);
-				fw().stageQueueCommand(
-				    {StageCmd::Command::PUSH,
-				     mksp<MessageBox>(tr("Abort Mission"),
-				                      format("%s %d", tr("Units Lost :"), unitsLost),
-				                      MessageBox::ButtonOptions::YesNo, [this] {
-					                      state->current_battle->abortMission(*state);
-					                      Battle::finishBattle(*state);
-					                      fw().stageQueueCommand({StageCmd::Command::REPLACEALL,
-					                                              mksp<BattleDebriefing>(state)});
-					                  })});
-			}
-			else
-			{
-				fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<Skirmish>(state)});
-			}
+			int unitsLost = state->current_battle->killStrandedUnits(
+			    *state, state->current_battle->currentPlayer, true);
+			fw().stageQueueCommand(
+			    {StageCmd::Command::PUSH,
+			     mksp<MessageBox>(tr("Abort Mission"),
+			                      format("%s %d", tr("Units Lost :"), unitsLost),
+			                      MessageBox::ButtonOptions::YesNo, [this] {
+				                      state->current_battle->abortMission(*state);
+				                      Battle::finishBattle(*state);
+				                      fw().stageQueueCommand({StageCmd::Command::REPLACEALL,
+				                                              mksp<BattleDebriefing>(state)});
+				                  })});
+		}
+		else if (e->forms().RaisedBy->Name == "BUTTON_SKIRMISH")
+		{
+			fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<Skirmish>(state)});
 		}
 	}
 	if (e->type() == EVENT_FORM_INTERACTION &&

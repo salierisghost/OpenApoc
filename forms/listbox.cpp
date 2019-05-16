@@ -205,6 +205,45 @@ void ListBox::update()
 	}
 	if (scroller)
 	{
+		size_t scrollerLength = Controls.empty() ? 0 : ItemSpacing * (Controls.size() - 1);
+		// deduct the listbox size from the content size
+		// assume item sizes are variable if ItemSize is 0 (ie: need to calculate manually)
+		switch (ListOrientation)
+		{
+			case Orientation::Vertical:
+			{
+				if (ItemSize == 0)
+				{
+					for (const auto &i : Controls)
+						scrollerLength += i->Size.y;
+				}
+				else
+				{
+					scrollerLength += Controls.size() * ItemSize;
+				}
+				scrollerLength = scrollerLength > Size.y ? scrollerLength - Size.y : 0;
+				break;
+			}
+			case Orientation::Horizontal:
+			{
+				if (ItemSize == 0)
+				{
+					for (const auto &i : Controls)
+						scrollerLength += i->Size.x;
+				}
+				else
+				{
+					scrollerLength += Controls.size() * ItemSize;
+				}
+				scrollerLength = scrollerLength > Size.x ? scrollerLength - Size.x : 0;
+				break;
+			}
+			default:
+				LogWarning("Unknown ListBox::ListOrientation value: %d",
+				           static_cast<int>(ListOrientation));
+				break;
+		}
+		scroller->setMaximum(scroller->getMinimum() + scrollerLength);
 		scroller->update();
 		Vec2<int> newScrollOffset = this->scrollOffset;
 		switch (ScrollOrientation)
@@ -246,6 +285,7 @@ void ListBox::clear()
 void ListBox::addItem(sp<Control> Item)
 {
 	Item->setParent(shared_from_this());
+	Item->ToolTipFont = this->ToolTipFont;
 	resolveLocation();
 	if (selected == nullptr)
 	{
@@ -266,6 +306,7 @@ void ListBox::replaceItem(sp<Control> Item)
 		{
 			Controls.erase(Controls.begin() + i);
 			Item->setParent(shared_from_this(), i);
+			Item->ToolTipFont = this->ToolTipFont;
 			resolveLocation();
 			if (oldItem == this->selected)
 			{

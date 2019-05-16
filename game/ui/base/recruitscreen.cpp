@@ -156,23 +156,29 @@ void RecruitScreen::populateAgentList()
 	}
 
 	auto player = state->getPlayer();
+	auto list = form->findControlTyped<ListBox>("LIST2");
 
 	// Populate list of agents
 	for (auto &a : state->agents)
 	{
+		UnitSkillState skill = UnitSkillState::Vertical;
+		if (a.second->type->role == AgentType::Role::Soldier)
+			skill = UnitSkillState::Hidden;
 		if (a.second->owner == player)
 		{
 			// Need to be able to strip agent
 			if (a.second->currentBuilding == a.second->homeBuilding)
 			{
 				agentLists[bases[a.second->homeBuilding->base.id]].push_back(
-				    ControlGenerator::createLargeAgentControl(*state, a.second));
+				    ControlGenerator::createLargeAgentControl(*state, a.second, list->Size.x,
+				                                              skill));
 			}
 		}
 		else if (a.second->owner->hirableAgentTypes.find(a.second->type) !=
 		         a.second->owner->hirableAgentTypes.end())
 		{
-			agentLists[8].push_back(ControlGenerator::createLargeAgentControl(*state, a.second));
+			agentLists[8].push_back(
+			    ControlGenerator::createLargeAgentControl(*state, a.second, list->Size.x, skill));
 		}
 	}
 }
@@ -408,7 +414,7 @@ void RecruitScreen::personnelSheet(sp<Agent> agent, sp<Form> formPersonnelStats)
 	formPersonnelStats->findControlTyped<Graphic>("SELECTED_PORTRAIT")
 	    ->setImage(agent->getPortrait().photo);
 	formPersonnelStats->findControlTyped<Label>("VALUE_SKILL")
-	    ->setText(format(tr("%d"), agent->getSkill()));
+	    ->setText(format("%d", agent->getSkill()));
 }
 
 /**
@@ -669,7 +675,7 @@ void RecruitScreen::eventOccurred(Event *e)
 
 	if (e->type() == EVENT_MOUSE_MOVE)
 	{
-		arrow->setVisible(!(e->mouse().X > form->Location.x + arrow->Location.x));
+		arrow->setVisible(!(e->mouse().X > arrow->getLocationOnScreen().x));
 	}
 
 	if (e->type() == EVENT_KEY_DOWN)

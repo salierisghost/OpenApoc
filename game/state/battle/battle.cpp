@@ -1326,7 +1326,7 @@ sp<BattleHazard> Battle::placeHazard(GameState &state, StateRef<Organisation> ow
 					LogWarning(
 					    "Ensure we are not putting out a fire that is attached to a feature!");
 				}
-				existingHazard->die(state, false);
+				existingHazard->dieAndRemove(state, false);
 			}
 		}
 		map->addObjectToMap(hazard);
@@ -1671,8 +1671,10 @@ void Battle::update(GameState &state, unsigned int ticks)
 	Trace::start("Battle::update::hazards->update");
 	for (auto it = this->hazards.begin(); it != this->hazards.end();)
 	{
-		auto d = *it++;
-		d->update(state, ticks);
+		if ((*it)->update(state, ticks))
+			it = hazards.erase(it);
+		else
+			++it;
 	}
 	Trace::end("Battle::update::hazards->update");
 	Trace::start("Battle::update::explosions->update");
@@ -1844,11 +1846,10 @@ void Battle::updateTBEnd(GameState &state)
 	Trace::start("Battle::updateTBEnd::hazards->update");
 	for (auto it = this->hazards.begin(); it != this->hazards.end();)
 	{
-		auto d = *it++;
-		if (d->ownerOrganisation == currentActiveOrganisation)
-		{
-			d->updateTB(state);
-		}
+		if ((*it)->ownerOrganisation == currentActiveOrganisation && (*it)->updateTB(state))
+			it = hazards.erase(it);
+		else
+			++it;
 	}
 	Trace::end("Battle::updateTBEnd::hazards->update");
 	Trace::start("Battle::updateTBEnd::items->update");
@@ -2649,8 +2650,9 @@ void Battle::finishBattle(GameState &state)
 			}
 			loot.push_back(e);
 		}
-		// Send home if not on vehicle
-		if (!u.second->agent->currentVehicle && !state.current_battle->skirmish)
+		// Send home if not on vehicle. Note that some units may not have a home building
+		if (!u.second->agent->currentVehicle && !state.current_battle->skirmish &&
+		    u.second->agent->homeBuilding != nullptr)
 		{
 			u.second->agent->setMission(state, AgentMission::gotoBuilding(state, *u.second->agent));
 		}
@@ -2830,7 +2832,7 @@ void Battle::finishBattle(GameState &state)
 	std::list<sp<BattleUnit>> unitsToRemove;
 	for (auto &u : state.current_battle->units)
 	{
-		if (u.second->owner != player || u.second->isDead())
+		if (u.second->owner != player || u.second->isDead() || u.second->agent->destroyAfterBattle)
 		{
 			unitsToRemove.push_back(u.second);
 		}
@@ -2964,13 +2966,13 @@ void Battle::exitBattle(GameState &state)
 		}
 
 		// Erase base and building
-		StateRef<Base> fakeBase = {&state, "SKIRMISH_BASE"};
+		StateRef<Base> fakeBase = {&state, "BASE_SKIRMISH"};
 		auto city = fakeBase->building->city;
 		fakeBase->building->currentAgents.clear();
 		fakeBase->building->base.clear();
 		fakeBase->building.clear();
-		city->buildings.erase("SKIRMISH_BUILDING");
-		state.player_bases.erase("SKIRMISH_BASE");
+		city->buildings.erase("BUILDING_SKIRMISH");
+		state.player_bases.erase("BASE_SKIRMISH");
 
 		// Erase vehicle
 		if (state.current_battle->player_craft)
@@ -3388,6 +3390,7 @@ void Battle::exitBattle(GameState &state)
 		case Battle::MissionType::AlienExtermination:
 		{
 			state.eventFromBattle = GameEventType::MissionCompletedBuildingNormal;
+			state.missionLocationBattle = state.current_battle->mission_location_id;
 			break;
 		}
 		case Battle::MissionType::BaseDefense:
@@ -3395,12 +3398,14 @@ void Battle::exitBattle(GameState &state)
 			if (state.current_battle->playerWon)
 			{
 				state.eventFromBattle = GameEventType::MissionCompletedBase;
+				state.missionLocationBattle = state.current_battle->mission_location_id;
 			}
 			else
 			{
 				auto building =
 				    StateRef<Building>{&state, state.current_battle->mission_location_id};
 				state.eventFromBattle = GameEventType::BaseDestroyed;
+				state.missionLocationBattle = state.current_battle->mission_location_id;
 				state.eventFromBattleText = building->base->name;
 				building->base->die(state, false);
 			}
@@ -3409,6 +3414,7 @@ void Battle::exitBattle(GameState &state)
 		case Battle::MissionType::RaidHumans:
 		{
 			state.eventFromBattle = GameEventType::MissionCompletedBuildingRaid;
+			state.missionLocationBattle = state.current_battle->mission_location_id;
 			if (state.current_battle->playerWon)
 			{
 				auto building =

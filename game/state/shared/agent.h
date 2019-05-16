@@ -133,6 +133,7 @@ class Agent : public StateObject,
 	// Position agent is moving towards
 	Vec3<float> goalPosition;
 
+	StateRef<Lab> lab_assigned = nullptr;
 	bool assigned_to_lab = false;
 
 	StateRef<BattleUnit> unit;
@@ -182,6 +183,9 @@ class Agent : public StateObject,
 
 	void die(GameState &state, bool silent = false);
 	bool isDead() const;
+
+	// for agents spawned specifically for the current battle, like turrets
+	bool destroyAfterBattle = false;
 
 	// Update agent in city
 	void update(GameState &state, unsigned ticks);

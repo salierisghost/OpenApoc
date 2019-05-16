@@ -16,6 +16,7 @@ ScrollBar::ScrollBar(sp<Image> gripperImage)
       Value(0), BarOrientation(Orientation::Vertical), RenderStyle(ScrollBarRenderStyle::Menu),
       GripperColour(220, 192, 192), Minimum(0), Maximum(10), LargeChange(2), LargePercent(10)
 {
+	isClickable = true;
 	if (!gripperbutton)
 		gripperbutton = fw().data->loadImage(
 		    "PCK:xcom3/ufodata/newbut.pck:xcom3/ufodata/newbut.tab:4:ui/menuopt.pal");
@@ -91,10 +92,14 @@ void ScrollBar::eventOccured(Event *e)
 		switch (BarOrientation)
 		{
 			case Orientation::Vertical:
-				mousePosition = e->forms().MouseInfo.Y;
+				// MouseInfo.X/Y is relative to the control that raised it
+				// make it relative to this control instead
+				mousePosition = e->forms().MouseInfo.Y +
+				                e->forms().RaisedBy->getLocationOnScreen().y - resolvedLocation.y;
 				break;
 			case Orientation::Horizontal:
-				mousePosition = e->forms().MouseInfo.X;
+				mousePosition = e->forms().MouseInfo.X +
+				                e->forms().RaisedBy->getLocationOnScreen().x - resolvedLocation.x;
 				break;
 		}
 	}
@@ -123,8 +128,8 @@ void ScrollBar::eventOccured(Event *e)
 		capture = false;
 	}
 
-	if (e->type() == EVENT_FORM_INTERACTION && e->forms().RaisedBy == shared_from_this() &&
-	    e->forms().EventFlag == FormEventType::MouseMove && capture)
+	if (e->type() == EVENT_FORM_INTERACTION && e->forms().EventFlag == FormEventType::MouseMove &&
+	    capture)
 	{
 		this->setValue(static_cast<int>(mousePosition / segmentsize) + Minimum);
 	}

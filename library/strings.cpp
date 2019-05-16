@@ -2,9 +2,7 @@
 #include "library/strings_format.h"
 #include <cctype>
 #include <tuple> // used for std::ignore
-// Disable automatic #pragma linking for boost - only enabled in msvc and that should provide boost
-// symbols as part of the module that uses it
-#define BOOST_ALL_NO_LIB
+
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/locale/message.hpp>
 
@@ -177,6 +175,7 @@ UString::UString(const char *cstr)
 		this->u8Str = cstr;
 	}
 }
+UString::UString(const char *cstr, size_t count) : u8Str(cstr, count) {}
 
 UString::UString(const UString &) = default;
 
@@ -350,6 +349,39 @@ bool UString::endsWith(const UString &suffix) const
 	return boost::ends_with(str(), suffix.str());
 }
 
+UString UString::trimLeft() const
+{
+	auto first = begin();
+	auto last = end();
+	while (first != last && Strings::isWhiteSpace(*first))
+		++first;
+	return {first, last};
+}
+UString UString::trimRight() const
+{
+	auto first = begin();
+	auto last = end();
+	if (first == last)
+		return {};
+	--last;
+	while (first != last && Strings::isWhiteSpace(*last))
+		--last;
+	return {first, ++last};
+}
+UString UString::trim() const
+{
+	auto first = begin();
+	auto last = end();
+	while (first != last && Strings::isWhiteSpace(*first))
+		++first;
+	if (first == last)
+		return {};
+	--last;
+	while (first != last && Strings::isWhiteSpace(*last))
+		--last;
+	return {first, ++last};
+}
+
 UString::ConstIterator UString::begin() const { return UString::ConstIterator(*this, 0); }
 
 UString::ConstIterator UString::end() const
@@ -368,9 +400,27 @@ UString::ConstIterator UString::ConstIterator::operator++()
 	return *this;
 }
 
+UString::ConstIterator UString::ConstIterator::operator--()
+{
+	const char *ptr = s.cStr();
+	ptr += --this->offset;
+	while (static_cast<unsigned char>(*ptr) >= 0b10000000 &&
+	       static_cast<unsigned char>(*ptr) < 0b11000000)
+	{
+		--this->offset;
+		--ptr;
+	}
+	return *this;
+}
+
 bool UString::ConstIterator::operator!=(const UString::ConstIterator &other) const
 {
 	return (this->offset != other.offset || this->s != other.s);
+}
+
+bool UString::ConstIterator::operator==(const UString::ConstIterator &other) const
+{
+	return this->offset == other.offset && this->s == other.s;
 }
 
 UniChar UString::ConstIterator::operator*() const

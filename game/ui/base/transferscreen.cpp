@@ -495,6 +495,13 @@ void TransferScreen::executeOrders()
 					case TransactionControl::Type::BioChemist:
 					case TransactionControl::Type::Engineer:
 					case TransactionControl::Type::Physicist:
+					{
+						StateRef<Agent> agent{state.get(), c->itemId};
+						StateRef<Lab> lab{state.get(), agent->lab_assigned};
+						agent->lab_assigned->removeAgent(lab, agent);
+						agent->transfer(*state, newBase->building);
+						break;
+					}
 					case TransactionControl::Type::Soldier:
 					{
 						StateRef<Agent> agent{state.get(), c->itemId};
@@ -531,6 +538,8 @@ void TransferScreen::executeOrders()
 						}
 						break;
 					}
+					default:
+						break;
 				}
 			}
 			if (c->getLinked())
@@ -678,7 +687,7 @@ void TransferScreen::render()
 	auto viewBase = currentSecondView->getData<Base>();
 	if (second_base == viewBase)
 	{
-		Vec2<int> pos = form->Location + currentSecondView->Location - 2;
+		Vec2<int> pos = currentSecondView->getLocationOnScreen() - 2;
 		Vec2<int> size = currentSecondView->Size + 4;
 		fw().renderer->drawRect(pos, size, COLOUR_RED);
 	}

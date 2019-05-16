@@ -27,7 +27,9 @@ class UString
 	  public:
 		// Just enough to struggle through a range-based for
 		bool operator!=(const ConstIterator &other) const;
+		bool operator==(const ConstIterator &other) const;
 		ConstIterator operator++();
+		ConstIterator operator--();
 		UniChar operator*() const;
 	};
 
@@ -38,6 +40,7 @@ class UString
 	UString(std::string &&str);
 	UString(UniChar uc);
 	UString(const char *cstr);
+	UString(const char *cstr, size_t count);
 	UString(UString &&other);
 	UString(ConstIterator first, ConstIterator last);
 	UString();
@@ -76,6 +79,10 @@ class UString
 	int compare(const UString &str) const;
 
 	bool endsWith(const UString &suffix) const;
+
+	UString trimLeft() const;
+	UString trimRight() const;
+	UString trim() const;
 
 	bool operator==(const UString &other) const;
 	bool operator!=(const UString &other) const;

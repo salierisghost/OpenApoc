@@ -10,6 +10,7 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package (Threads REQUIRED)
 
 set (LIBRARY_SOURCE_FILES
+	colour.cpp
 	strings.cpp
 	voxel.cpp)
 source_group(library\\sources FILES ${LIBRARY_SOURCE_FILES})
@@ -24,8 +25,7 @@ set (LIBRARY_HEADER_FILES
 	resource.h
 	voxel.h
 	line.h
-	xorshift.h
-	vector_remove.h)
+	xorshift.h)
 source_group(library\\headers FILES ${LIBRARY_HEADER_FILES})
 
 list(APPEND ALL_SOURCE_FILES ${LIBRARY_SOURCE_FILES})

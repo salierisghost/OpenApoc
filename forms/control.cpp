@@ -19,7 +19,10 @@ Control::Control(bool takesFocus)
     : mouseInside(false), mouseDepressed(false), resolvedLocation(0, 0), Visible(true),
       Name("Control"), Location(0, 0), Size(0, 0), SelectionSize(0, 0),
       BackgroundColour(0, 0, 0, 0), takesFocus(takesFocus), showBounds(false), Enabled(true),
-      canCopy(true), funcPreRender(nullptr)
+      canCopy(true), funcPreRender(nullptr), isClickable(false),
+      // Tooltip defaults
+      ToolTipBackground{128, 128, 128}, ToolTipBorders{
+                                            {1, {0, 0, 0}}, {1, {255, 255, 255}}, {1, {0, 0, 0, 0}}}
 {
 }
 
@@ -141,6 +144,10 @@ void Control::eventOccured(Event *e)
 			{
 				this->pushFormEvent(FormEventType::MouseDown, e);
 				mouseDepressed = true;
+				if (isClickable)
+				{
+					e->Handled = true;
+				}
 			}
 		}
 
@@ -194,9 +201,7 @@ void Control::eventOccured(Event *e)
 					{
 						this->pushFormEvent(FormEventType::MouseEnter, &fakeMouseEvent);
 					}
-
 					this->pushFormEvent(FormEventType::MouseMove, &fakeMouseEvent);
-
 					e->Handled = true;
 				}
 				else
@@ -268,6 +273,71 @@ void Control::eventOccured(Event *e)
 			this->pushFormEvent(FormEventType::TextInput, e);
 
 			e->Handled = true;
+		}
+	}
+
+	if (e->type() == EVENT_FORM_INTERACTION)
+	{
+		if (e->forms().EventFlag == FormEventType::MouseMove)
+		{
+			if (e->forms().RaisedBy == shared_from_this())
+			{
+				if (!ToolTipText.empty())
+				{
+					up<FormsEvent> toolTipEvent = mkup<FormsEvent>();
+					toolTipEvent->forms().RaisedBy = shared_from_this();
+					toolTipEvent->forms().EventFlag = FormEventType::ToolTip;
+					toolTipEvent->forms().MouseInfo = e->forms().MouseInfo;
+					fw().toolTipStartTimer(std::move(toolTipEvent));
+					e->Handled = true;
+				}
+				else
+				{
+					fw().toolTipStopTimer();
+				}
+			}
+		}
+		else if (e->forms().EventFlag == FormEventType::ToolTip)
+		{
+			if (e->forms().RaisedBy == shared_from_this())
+			{
+				Vec2<int> pos = {e->forms().MouseInfo.X, e->forms().MouseInfo.Y};
+				e->Handled = true;
+
+				sp<Image> textImage = ToolTipFont->getString(ToolTipText);
+
+				unsigned totalBorder = 0;
+				for (const auto &b : ToolTipBorders)
+					totalBorder += b.first;
+
+				sp<Surface> surface = mksp<Surface>(
+				    textImage->size + Vec2<unsigned int>{totalBorder * 2, totalBorder * 2});
+
+				RendererSurfaceBinding b(*fw().renderer, surface);
+
+				fw().renderer->drawFilledRect({0, 0}, surface->size, ToolTipBackground);
+				int i = 0;
+				for (const auto &b : ToolTipBorders)
+				{
+					fw().renderer->drawRect({i, i},
+					                        surface->size - Vec2<unsigned int>{i * 2, i * 2},
+					                        b.second, b.first);
+					i += b.first;
+				}
+				fw().renderer->draw(textImage, {totalBorder, totalBorder});
+
+				fw().showToolTip(surface,
+				                 pos + resolvedLocation -
+				                     Vec2<int>{surface->size.x / 2, surface->size.y});
+			}
+		}
+		else if (e->forms().EventFlag == FormEventType::MouseClick ||
+		         e->forms().EventFlag == FormEventType::MouseDown)
+		{
+			if (e->forms().RaisedBy == shared_from_this())
+			{
+				fw().toolTipStopTimer();
+			}
 		}
 	}
 }
@@ -525,6 +595,10 @@ void Control::configureSelfFromXml(pugi::xml_node *node)
 	{
 		this->showBounds = node->attribute("border").as_bool();
 	}
+	if (node->attribute("isclickable"))
+	{
+		this->isClickable = node->attribute("isclickable").as_bool();
+	}
 
 	auto parentControl = this->getParent();
 	for (auto child = node->first_child(); child; child = child.next_sibling())
@@ -645,6 +719,50 @@ void Control::configureSelfFromXml(pugi::xml_node *node)
 					LogWarning("Control \"%s\" has not supported size y value \"%s\"", this->Name,
 					           specialsizey);
 				}
+			}
+		}
+		else if (childName == "tooltip")
+		{
+			if (ToolTipFont = ui().getFont(child.attribute("font").as_string()))
+			{
+				ToolTipText = child.attribute("text").as_string();
+				if (!ToolTipText.empty())
+					ToolTipText = tr(ToolTipText);
+			}
+			else
+			{
+				LogWarning("Could not find font for tooltip of control \"%s\"", Name);
+			}
+			UString backgroundString = child.attribute("background").as_string();
+			if (!backgroundString.empty())
+			{
+				if (*backgroundString.begin() == '#')
+					ToolTipBackground = Colour::FromHex(backgroundString);
+				else
+					ToolTipBackground = Colour::FromHtmlName(backgroundString);
+			}
+			size_t numDefaultBorders = ToolTipBorders.size();
+			for (auto child2 = child.first_child(); child2; child2 = child2.next_sibling())
+			{
+				UString child2Name = child2.name();
+				if (child2Name == "border")
+				{
+					UString borderColourStr = child2.attribute("colour").as_string();
+					Colour borderColour;
+					if (*borderColourStr.begin() == '#')
+						borderColour = Colour::FromHex(borderColourStr);
+					else
+						borderColour = Colour::FromHtmlName(borderColourStr);
+					borderColour.a = child2.attribute("alpha").as_uint(255);
+					ToolTipBorders.emplace_back(child2.attribute("width").as_uint(1), borderColour);
+				}
+			}
+			if (numDefaultBorders != ToolTipBorders.size())
+			{
+				// this means that the xml file has specified what border styles to use
+				// we have to remove the default borders so the new ones don't stack over them
+				ToolTipBorders.erase(ToolTipBorders.begin(),
+				                     ToolTipBorders.begin() + numDefaultBorders);
 			}
 		}
 	}
@@ -781,12 +899,6 @@ sp<Control> Control::getAncestor(sp<Control> Parent)
 	return ancestor;
 }
 
-Vec2<int> Control::getLocationOnScreen() const
-{
-	Vec2<int> r(resolvedLocation.x, resolvedLocation.y);
-	return r;
-}
-
 void Control::setRelativeWidth(float widthFactor)
 {
 	if (widthFactor == 0)
@@ -905,6 +1017,11 @@ void Control::copyControlData(sp<Control> CopyOf)
 	CopyOf->takesFocus = this->takesFocus;
 	CopyOf->showBounds = this->showBounds;
 	CopyOf->Visible = this->Visible;
+	CopyOf->isClickable = this->isClickable;
+	CopyOf->ToolTipText = this->ToolTipText;
+	CopyOf->ToolTipFont = this->ToolTipFont;
+	CopyOf->ToolTipBackground = this->ToolTipBackground;
+	CopyOf->ToolTipBorders = this->ToolTipBorders;
 
 	for (auto &c : Controls)
 	{
